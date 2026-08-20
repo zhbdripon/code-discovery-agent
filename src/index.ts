@@ -1,12 +1,9 @@
 import dotenv from "dotenv";
 import OpenAI from "openai";
-import { getConfig } from "./config";
-import { tools, listFiles } from "./tools";
 import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
-import {
-  ResponseInput,
-  ResponseInputItem,
-} from "openai/resources/responses/responses.js";
+import { ResponseInputItem } from "openai/resources/responses/responses.js";
+import { getConfig } from "./config";
+import { listFiles, searchCode, tools } from "./tools";
 
 dotenv.config();
 const config = getConfig();
@@ -25,10 +22,10 @@ let input: ResponseInputItem[] = [
 ];
 
 async function main() {
-  let totalLoop = 2;
+  let totalLoop = 15;
   while (totalLoop > 0) {
     const response = await client.responses.create({
-      model: "gpt-5.6",
+      model: "gpt-5.4-mini",
       instructions: `
             You are a software repository investigation assistant.
       
@@ -40,8 +37,7 @@ async function main() {
     });
 
     input.push(...toResponseInputItems(response.output));
-
-    console.log("Response 1:", response.output_text);
+    console.log("Response from llm: ", response.output, response);
 
     const toolCalls = response.output.filter(
       (item) => item.type === "function_call",
@@ -52,10 +48,27 @@ async function main() {
       break;
     }
 
+    console.log("Tool Calls requested:", totalLoop, toolCalls);
+
     for (const tool of toolCalls) {
       if (tool.name === "list_files") {
         const response = await listFiles();
-        console.log("List Files Response:", response);
+        console.log("List Files Response:", response.length, response); // Log the number of results and the first 5 results
+
+        input.push({
+          type: "function_call_output",
+          call_id: tool.call_id,
+          output: JSON.stringify(response),
+        });
+      }
+
+      if (tool.name === "search_code") {
+        const { files, query, isRegex, flags } = JSON.parse(tool.arguments);
+        console.log(
+          `Searching code with query: ${query}, isRegex: ${isRegex}, flags: ${flags}`,
+        );
+        const response = await searchCode({ files, query, isRegex, flags });
+        console.log("Search Code Response:", response.length, response.slice(0, 5)); // Log the number of results and the first 5 results
 
         input.push({
           type: "function_call_output",
@@ -64,10 +77,6 @@ async function main() {
         });
       }
     }
-
-    console.log("Tool Calls:", totalLoop, toolCalls);
-    console.log("Updated Input for Next Iteration:", input);
-
     totalLoop--;
   }
 }
