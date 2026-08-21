@@ -14,15 +14,35 @@ const client = new OpenAI({
 
 console.log(`Starting ${config.appName} on port ${config.port}`);
 
+const MAX_LLM_LOOP = 15;
+const MAX_TOOL_CALLS: Record<string, number> = {
+  list_files: 5,
+  search_code: 5,
+};
+
 // context for the LLM to keep track of the conversation and tool calls
 let inputOutputHistory: ResponseInputItem[] = [
   {
     role: "user",
-    content: "what vector database used in the codebase?",
+    content: "How Authentication implemented?",
   },
 ];
 
-const MAX_LLM_LOOP = 15;
+type asyncFunction = (...args: any[]) => Promise<unknown>;
+
+const toolFromToolName: Record<string, asyncFunction> = {
+  list_files: listFiles,
+  search_code: searchCodes,
+};
+
+const toolCallCounts: Record<string, number> = {
+  list_files: 0,
+  search_code: 0,
+};
+
+const canUseTool = (toolName: string): boolean => {
+  return toolCallCounts[toolName] < MAX_TOOL_CALLS[toolName];
+};
 
 async function main() {
   let iterationCount = 0;
@@ -59,35 +79,29 @@ async function main() {
       break;
     }
 
-    console.log("Tool Calls requested:", iterationCount, toolCalls);
+    for (const toolCall of toolCalls) {
+      if (toolFromToolName[toolCall.name]) {
+        if (!canUseTool(toolCall.name)) {
+          console.log(`Maximum calls reached for toolCall: ${toolCall.name}`);
 
-    for (const tool of toolCalls) {
-      if (tool.name === "list_files") {
-        const response = await listFiles();
-        console.log("List Files Response:", response.length, response);
+          inputOutputHistory.push({
+            type: "function_call_output",
+            call_id: toolCall.call_id,
+            output: JSON.stringify({
+              error: `Tool "${toolCall.name}" has reached its usage limit.`,
+            }),
+          });
+          continue;
+        }
 
-        inputOutputHistory.push({
-          type: "function_call_output",
-          call_id: tool.call_id,
-          output: JSON.stringify(response),
-        });
-      }
-
-      if (tool.name === "search_code") {
-        const { files, query, isRegex, flags } = JSON.parse(tool.arguments);
-        console.log(
-          `Searching code with query: ${query}, isRegex: ${isRegex}, flags: ${flags}`,
-        );
-        const response = await searchCodes({ files, query, isRegex, flags });
-        console.log(
-          "Search Code Response:",
-          response.length,
-          response.slice(0, 5),
-        ); // Log the number of results and the first 5 results
+        toolCallCounts[toolCall.name]++;
+        const toolArgs = JSON.parse(toolCall.arguments);
+        const response = await toolFromToolName[toolCall.name](toolArgs);
+        console.log(`${toolCall.name} Response:`, response);
 
         inputOutputHistory.push({
           type: "function_call_output",
-          call_id: tool.call_id,
+          call_id: toolCall.call_id,
           output: JSON.stringify(response),
         });
       }
