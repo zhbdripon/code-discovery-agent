@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
 import { ResponseInputItem } from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
-import { listFiles, searchCodes, tools } from "./tools";
+import { listFiles, searchCodes, tools, readFile } from "./tools";
 
 // setups
 dotenv.config();
@@ -16,8 +16,9 @@ console.log(`Starting ${config.appName} on port ${config.port}`);
 
 const MAX_LLM_LOOP = 15;
 const MAX_TOOL_CALLS: Record<string, number> = {
-  list_files: 5,
+  list_files: 1,
   search_code: 5,
+  read_file: 5,
 };
 
 // context for the LLM to keep track of the conversation and tool calls
@@ -33,11 +34,13 @@ type asyncFunction = (...args: any[]) => Promise<unknown>;
 const toolFromToolName: Record<string, asyncFunction> = {
   list_files: listFiles,
   search_code: searchCodes,
+  read_file: readFile,
 };
 
 const toolCallCounts: Record<string, number> = {
   list_files: 0,
   search_code: 0,
+  read_file: 0,
 };
 
 const canUseTool = (toolName: string): boolean => {
@@ -75,7 +78,6 @@ async function main() {
     );
 
     if (!toolCalls || toolCalls.length === 0) {
-      console.log("No tool calls found in the response.");
       break;
     }
 

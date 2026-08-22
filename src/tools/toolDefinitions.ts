@@ -44,4 +44,24 @@ export const searchCodeTool = {
   strict: true,
 };
 
-export const tools = [listFilesTool, searchCodeTool];
+export const readFileTool = {
+  type: "function" as const,
+  name: "read_file",
+  description: `
+    Read the contents of a repository file.
+  `,
+  parameters: {
+    type: "object",
+    properties: {
+      filePath: {
+        type: "string",
+        description: "file path relative to the repository root",
+      },
+    },
+    required: ["filePath"],
+    additionalProperties: false,
+  },
+  strict: true,
+};
+
+export const tools = [listFilesTool, searchCodeTool, readFileTool];
