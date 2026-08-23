@@ -1,9 +1,10 @@
 import dotenv from "dotenv";
+import readline from "node:readline/promises";
 import OpenAI from "openai";
 import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
 import { ResponseInputItem } from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
-import { listFiles, searchCodes, tools, readFile } from "./tools";
+import { listFiles, readFile, searchCodes, tools } from "./tools";
 
 // setups
 dotenv.config();
@@ -12,10 +13,15 @@ const client = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
 });
 
+const reader = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
 console.log(`Starting ${config.appName} on port ${config.port}`);
 
 const MAX_LLM_LOOP = 15;
-const MAX_TOOL_CALLS: Record<string, number> = {
+const MAX_TOOL_CALLS_PER_TURN: Record<string, number> = {
   list_files: 1,
   search_code: 5,
   read_file: 5,
@@ -44,7 +50,21 @@ const toolCallCounts: Record<string, number> = {
 };
 
 const canUseTool = (toolName: string): boolean => {
-  return toolCallCounts[toolName] < MAX_TOOL_CALLS[toolName];
+  return toolCallCounts[toolName] < MAX_TOOL_CALLS_PER_TURN[toolName];
+};
+
+const promptUserForInput = async (): Promise<void> => {
+  const newUserInput = await reader.question("user: ");
+  inputOutputHistory.push({
+    role: "user",
+    content: newUserInput,
+  });
+};
+
+const resetToolCallCounts = (): void => {
+  for (const toolName in toolCallCounts) {
+    toolCallCounts[toolName] = 0;
+  }
 };
 
 async function main() {
@@ -78,7 +98,9 @@ async function main() {
     );
 
     if (!toolCalls || toolCalls.length === 0) {
-      break;
+      await promptUserForInput();
+      resetToolCallCounts();
+      continue;
     }
 
     for (const toolCall of toolCalls) {
@@ -111,10 +133,14 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("Error:", error);
-  process.exit(1);
-});
+main()
+  .catch((error) => {
+    console.error("Error:", error);
+    process.exit(1);
+  })
+  .finally(() => {
+    reader.close();
+  });
 
 // Placeholder for application logic
 process.on("SIGINT", () => {
