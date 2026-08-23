@@ -130,7 +130,11 @@ async function main() {
         });
       }
     }
+    
   }
+
+  console.log("Maximum iterations reached. Exiting.");
+  process.exit(0);
 }
 
 main()
@@ -142,7 +146,6 @@ main()
     reader.close();
   });
 
-// Placeholder for application logic
 process.on("SIGINT", () => {
   console.log("Shutting down");
   process.exit(0);

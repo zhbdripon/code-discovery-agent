@@ -6,14 +6,15 @@ tools (`list_files` and `search_code`). It uses `dotenv` for environment
 configuration and TypeScript for strict typing.
 
 **What this project does**
-- Starts a small runner (src/index.ts) that calls the OpenAI Responses API
+- Starts a small runner (`src/index.ts`) that calls the OpenAI Responses API
 	and allows the model to invoke local tools to inspect a codebase.
-- Includes two tools under `src/tools`:
+- Includes tools under `src/tools`:
 	- `list_files`: recursively lists files under a configured project root.
 	- `search_code`: searches provided files/paths for a string or regex.
+	- `read_file`: reads the contents of a single file (relative path).
 
-**Prerequisites**
-- Node 18+ (for `node:` builtin imports)
+- **Prerequisites**
+- Node 20+ (for `node:readline/promises` and `node:` builtin imports)
 - An OpenAI API key (set `OPENAI_API_KEY` in your environment)
 
 Installation
