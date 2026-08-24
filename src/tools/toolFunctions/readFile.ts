@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const PROJECT_ROOT = path.resolve("../study-buddy");
+const PROJECT_ROOT = path.resolve("../hellochat");
 
 export default async function readFile({ filePath }: { filePath: string }) {
   const fullPath = path.join(PROJECT_ROOT, filePath);

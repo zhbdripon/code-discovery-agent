@@ -22,9 +22,9 @@ console.log(`Starting ${config.appName} on port ${config.port}`);
 
 const MAX_LLM_LOOP = 15;
 const MAX_TOOL_CALLS_PER_TURN: Record<string, number> = {
-  list_files: 1,
-  search_code: 5,
-  read_file: 5,
+  list_files: 5,
+  search_code: 10,
+  read_file: 10,
 };
 
 // context for the LLM to keep track of the conversation and tool calls
@@ -78,7 +78,11 @@ async function main() {
       instructions: `
             You are a software repository investigation assistant.
       
-            Investigate the repository using tools.
+            Investigate the repository using tools. Generally you don't want to discover files 
+            and folders ignored by .gitignore and hidden folders start with dot unless you have a 
+            strong reason to.
+
+            You can use the tools to explore the repository and answer the user's questions.
             Do not guess.
           `,
       tools,
@@ -130,7 +134,6 @@ async function main() {
         });
       }
     }
-    
   }
 
   console.log("Maximum iterations reached. Exiting.");

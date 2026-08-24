@@ -1,11 +1,32 @@
 export const listFilesTool = {
   type: "function" as const,
   name: "list_files",
-  description: "List all files in the current directory",
+  description:
+    "List files in the given directory path relative to the project root, with optional depth and filters.",
   parameters: {
     type: "object",
-    properties: {},
+    properties: {
+      path: {
+        type: "string",
+        description: "Path relative to project root to start scanning",
+      },
+      depth: {
+        type: "number",
+        description:
+          "Maximum recursion depth (0 = only files in the start directory)",
+      },
+      includeGitIgnore: {
+        type: "boolean",
+        description: "When true, include files ignored by .gitignore",
+      },
+      includeHidden: {
+        type: "boolean",
+        description:
+          "When true, include hidden directories (names starting with a dot)",
+      },
+    },
     additionalProperties: false,
+    required: ["path", "depth", "includeGitIgnore", "includeHidden"],
   },
   strict: true,
 };
