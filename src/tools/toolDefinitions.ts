@@ -23,7 +23,7 @@ export const searchCodeTool = {
       files: {
         type: "array",
         items: { type: "string" },
-        description: "The list of files to search in",
+        description: "The list of file paths relative to the repository root to search in",
       },
       query: {
         type: "string",

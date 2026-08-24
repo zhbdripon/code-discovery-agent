@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const PROJECT_ROOT = path.resolve("../study-buddy");
+const PROJECT_ROOT = path.resolve("../hellochat");
 
 export default async function searchCode({
   files,
@@ -16,36 +16,18 @@ export default async function searchCode({
 }) {
   const results: { file: string; line: number; content: string }[] = [];
   const normalizedFiles = new Set<string>();
-
-  async function collectFiles(target: string) {
-    const fullPath = path.resolve(PROJECT_ROOT, target);
-
+  // Only consider the exact file paths provided. Do not recurse into directories.
+  for (const file of files) {
+    const fullPath = path.resolve(PROJECT_ROOT, file);
     try {
       const stat = await fs.stat(fullPath);
-      if (stat.isDirectory()) {
-        const entries = await fs.readdir(fullPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const entryPath = path.join(target, entry.name);
-          if (entry.name.startsWith(".")) continue;
-          if (entry.isDirectory()) {
-            await collectFiles(entryPath);
-          } else if (entry.isFile()) {
-            normalizedFiles.add(entryPath);
-          }
-        }
-        return;
-      }
-
       if (stat.isFile()) {
-        normalizedFiles.add(target);
+        normalizedFiles.add(file);
       }
+      // If it's a directory or other type, ignore it.
     } catch {
       // Ignore missing or invalid paths.
     }
-  }
-
-  for (const file of files) {
-    await collectFiles(file);
   }
 
   let pattern: RegExp | undefined;
