@@ -85,4 +85,4 @@ export const readFileTool = {
   strict: true,
 };
 
-export const tools = [listFilesTool, searchCodeTool, readFileTool];
+export const toolDefinitions = [listFilesTool, searchCodeTool, readFileTool];

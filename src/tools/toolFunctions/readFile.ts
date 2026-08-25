@@ -1,14 +1,24 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const PROJECT_ROOT = path.resolve("../hellochat");
-
-export default async function readFile({ filePath }: { filePath: string }) {
-  const fullPath = path.join(PROJECT_ROOT, filePath);
+export default async function readFile({
+  projectRoot,
+  filePath,
+}: {
+  projectRoot: string;
+  filePath: string;
+}) {
+  const fullPath = path.join(projectRoot, filePath);
   try {
     const content = await fs.readFile(fullPath, "utf-8");
-    return content;
+    return { ok: true, content };
   } catch (error) {
-    throw new Error(`Failed to read file at ${filePath}: ${error}`);
+    // Provide a structured error so callers (and the LLM) can detect missing files
+    const e: any = error;
+    if (e && e.code === "ENOENT") {
+      return { ok: false, error: "not_found", message: `File not found: ${filePath}` };
+    }
+    console.log(`Failed to read file at ${filePath}: ${error}`);
+    return { ok: false, error: "read_error", message: e?.message || "Unknown error occurred while reading the file." };
   }
 }

@@ -1,10 +1,11 @@
 import dotenv from "dotenv";
+import path from "node:path";
 import readline from "node:readline/promises";
 import OpenAI from "openai";
 import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
 import { ResponseInputItem } from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
-import { listFiles, readFile, searchCodes, tools } from "./tools";
+import { createTools } from "./tools";
 
 // setups
 dotenv.config();
@@ -12,7 +13,6 @@ const config = getConfig();
 const client = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
 });
-
 const reader = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -20,38 +20,14 @@ const reader = readline.createInterface({
 
 console.log(`Starting ${config.appName} on port ${config.port}`);
 
-const MAX_LLM_LOOP = 15;
-const MAX_TOOL_CALLS_PER_TURN: Record<string, number> = {
-  list_files: 5,
-  search_code: 10,
-  read_file: 10,
-};
+const {
+  maxModelLoop,
+}: {
+  maxModelLoop: number;
+} = config;
 
 // context for the LLM to keep track of the conversation and tool calls
-let inputOutputHistory: ResponseInputItem[] = [
-  {
-    role: "user",
-    content: "How Authentication implemented?",
-  },
-];
-
-type asyncFunction = (...args: any[]) => Promise<unknown>;
-
-const toolFromToolName: Record<string, asyncFunction> = {
-  list_files: listFiles,
-  search_code: searchCodes,
-  read_file: readFile,
-};
-
-const toolCallCounts: Record<string, number> = {
-  list_files: 0,
-  search_code: 0,
-  read_file: 0,
-};
-
-const canUseTool = (toolName: string): boolean => {
-  return toolCallCounts[toolName] < MAX_TOOL_CALLS_PER_TURN[toolName];
-};
+let inputOutputHistory: ResponseInputItem[] = [];
 
 const promptUserForInput = async (): Promise<void> => {
   const newUserInput = await reader.question("user: ");
@@ -61,16 +37,49 @@ const promptUserForInput = async (): Promise<void> => {
   });
 };
 
-const resetToolCallCounts = (): void => {
+const resetToolCallCounts = (toolCallCounts: Record<string, number>): void => {
   for (const toolName in toolCallCounts) {
     toolCallCounts[toolName] = 0;
   }
 };
 
 async function main() {
+  // Prompt for project root before starting the main loop
+  const projectPathInput = await reader.question(
+    "\n\nProject path (leave empty for current working dir): ",
+  );
+
+  let initialQuery = await reader.question(
+    "\n\nWhat do you want to know about the repository?\nuser: ",
+  );
+
+  inputOutputHistory.push({
+    role: "user",
+    content: initialQuery,
+  });
+
+  const projectRoot =
+    projectPathInput && projectPathInput.trim()
+      ? path.isAbsolute(projectPathInput.trim())
+        ? projectPathInput.trim()
+        : path.resolve(process.cwd(), projectPathInput.trim())
+      : process.cwd();
+
+  const {
+    toolDefinitions: tools,
+    toolFuncFromToolName,
+    canUseTool,
+  } = createTools(projectRoot);
+
+  const toolCallCounts: Record<string, number> = {
+    list_files: 0,
+    search_code: 0,
+    read_file: 0,
+  };
+
   let iterationCount = 0;
 
-  while (iterationCount <= MAX_LLM_LOOP) {
+  while (iterationCount <= maxModelLoop) {
     iterationCount++;
 
     const response = await client.responses.create({
@@ -103,13 +112,13 @@ async function main() {
 
     if (!toolCalls || toolCalls.length === 0) {
       await promptUserForInput();
-      resetToolCallCounts();
+      resetToolCallCounts(toolCallCounts);
       continue;
     }
 
     for (const toolCall of toolCalls) {
-      if (toolFromToolName[toolCall.name]) {
-        if (!canUseTool(toolCall.name)) {
+      if (toolFuncFromToolName[toolCall.name]) {
+        if (!canUseTool(toolCallCounts, toolCall.name)) {
           console.log(`Maximum calls reached for toolCall: ${toolCall.name}`);
 
           inputOutputHistory.push({
@@ -124,7 +133,7 @@ async function main() {
 
         toolCallCounts[toolCall.name]++;
         const toolArgs = JSON.parse(toolCall.arguments);
-        const response = await toolFromToolName[toolCall.name](toolArgs);
+        const response = await toolFuncFromToolName[toolCall.name](toolArgs);
         console.log(`${toolCall.name} Response:`, response);
 
         inputOutputHistory.push({

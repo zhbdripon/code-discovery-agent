@@ -1,24 +1,24 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const PROJECT_ROOT = path.resolve("../hellochat");
-
 export default async function searchCode({
   files,
   query,
   isRegex = false,
   flags = "",
+  projectRoot,
 }: {
   files: string[];
   query: string | RegExp;
   isRegex?: boolean;
   flags?: string;
+  projectRoot: string;
 }) {
   const results: { file: string; line: number; content: string }[] = [];
   const normalizedFiles = new Set<string>();
   // Only consider the exact file paths provided. Do not recurse into directories.
   for (const file of files) {
-    const fullPath = path.resolve(PROJECT_ROOT, file);
+    const fullPath = path.resolve(projectRoot, file);
     try {
       const stat = await fs.stat(fullPath);
       if (stat.isFile()) {
@@ -38,7 +38,7 @@ export default async function searchCode({
   }
 
   for (const file of normalizedFiles) {
-    const fullPath = path.join(PROJECT_ROOT, file);
+    const fullPath = path.join(projectRoot, file);
     const content = await fs.readFile(fullPath, "utf-8");
     const lines = content.split("\n");
     lines.forEach((lineContent, index) => {

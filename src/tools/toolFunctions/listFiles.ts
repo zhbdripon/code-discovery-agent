@@ -1,17 +1,18 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const PROJECT_ROOT = path.resolve("../hellochat");
-
 const HARD_EXCLUDE = new Set([".git", ".next", "node_modules"]);
 
-function readGitignore(projectRoot: string) {
+async function getGitIgnores(projectRoot: string): Promise<string[]> {
   const gitignorePath = path.join(projectRoot, ".gitignore");
   try {
-    const content = fs.readFile(gitignorePath, "utf-8");
-    return content;
+    const content = await fs.readFile(gitignorePath, "utf-8");
+    return content
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -45,34 +46,23 @@ function matchesGitignore(relPosix: string, patterns: string[]) {
 }
 
 export default async function listFiles({
+  projectRoot,
   startPath = ".",
   depth = Infinity,
   includeGitIgnore = false,
   includeHidden = false,
 }: {
+  projectRoot: string;
   startPath?: string;
   depth?: number;
   includeGitIgnore?: boolean;
   includeHidden?: boolean;
-} = {}) {
+}) {
   const results: string[] = [];
-
   // load gitignore patterns if needed
-  let gitignorePatterns: string[] = [];
-  if (!includeGitIgnore) {
-    try {
-      const gi = await fs.readFile(
-        path.join(PROJECT_ROOT, ".gitignore"),
-        "utf-8",
-      );
-      gitignorePatterns = gi
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean);
-    } catch {
-      gitignorePatterns = [];
-    }
-  }
+  let gitignorePatterns: string[] = !includeGitIgnore
+    ? await getGitIgnores(projectRoot)
+    : [];
 
   async function walk(dir: string, currentDepth: number) {
     if (currentDepth > depth) return;
@@ -85,7 +75,7 @@ export default async function listFiles({
 
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
-      const rel = path.relative(PROJECT_ROOT, full) || entry.name;
+      const rel = path.relative(projectRoot, full) || entry.name;
       const relPosix = rel.split(path.sep).join("/");
       const segments = rel.split(path.sep).filter(Boolean);
 
@@ -117,7 +107,7 @@ export default async function listFiles({
     }
   }
 
-  const startFull = path.resolve(PROJECT_ROOT, startPath);
+  const startFull = path.resolve(projectRoot, startPath);
   await walk(startFull, 0);
   return results;
 }
