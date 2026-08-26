@@ -6,6 +6,7 @@ export default async function readFile({
   projectRoot,
   filePath,
 }: ReadFileArgs) {
+  console.log(`Attempting to read file at ${filePath} within project root ${projectRoot}`, filePath);
   const fullPath = path.join(projectRoot, filePath);
   try {
     const content = await fs.readFile(fullPath, "utf-8");

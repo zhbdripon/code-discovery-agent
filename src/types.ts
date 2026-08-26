@@ -19,3 +19,7 @@ export type ReadFileArgs = {
   projectRoot: string;
 };
 
+// Allow `any` here because tool functions accept differing argument shapes
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type asyncFunction = (...args: any[]) => Promise<unknown>;
+
