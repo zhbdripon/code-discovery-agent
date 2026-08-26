@@ -1,19 +1,27 @@
-export { listFilesTool, readFileTool, searchCodeInFilesTool } from "./toolDefinitions";
+export {
+  listFilesTool,
+  readFileTool,
+  searchCodeInFilesTool,
+} from "./toolDefinitions";
 
+import { ListFilesArgs, ReadFileArgs, SearchCodeInFilesArgs } from "../types";
 import { toolDefinitions } from "./toolDefinitions";
 import listFilesImpl from "./toolFunctions/listFiles";
 import readFileImpl from "./toolFunctions/readFile";
 import searchCodeInFilesImpl from "./toolFunctions/searchCodeInFiles";
 
+// Allow `any` here because tool functions accept differing argument shapes
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type asyncFunction = (...args: any[]) => Promise<unknown>;
 
 export function createTools(projectRoot: string) {
   // wrappers that inject projectRoot into tool implementations
-  const listFiles = (args: any) =>
+  const listFiles = (args: Omit<ListFilesArgs, "projectRoot">) =>
     listFilesImpl({ ...(args || {}), projectRoot });
-  const searchCodeInFiles = (args: any) =>
-    searchCodeInFilesImpl({ ...(args || {}), projectRoot });
-  const readFile = (args: any) =>
+  const searchCodeInFiles = (
+    args: Omit<SearchCodeInFilesArgs, "projectRoot">,
+  ) => searchCodeInFilesImpl({ ...(args || {}), projectRoot });
+  const readFile = (args: Omit<ReadFileArgs, "projectRoot">) =>
     readFileImpl({ ...(args || {}), projectRoot });
 
   const toolFuncFromToolName: Record<string, asyncFunction> = {
@@ -45,7 +53,7 @@ export function createTools(projectRoot: string) {
   };
 
   const incrementToolCallCount = (toolName: string): void => {
-    if (toolCallCounts.hasOwnProperty(toolName)) {
+    if (Object.prototype.hasOwnProperty.call(toolCallCounts, toolName)) {
       toolCallCounts[toolName]++;
     }
   };

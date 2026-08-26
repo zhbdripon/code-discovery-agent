@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { ListFilesArgs } from "../../types";
 
 const HARD_EXCLUDE = new Set([".git", ".next", "node_modules"]);
 
@@ -51,16 +52,10 @@ export default async function listFiles({
   depth = Infinity,
   includeGitIgnore = false,
   includeHidden = false,
-}: {
-  projectRoot: string;
-  startPath?: string;
-  depth?: number;
-  includeGitIgnore?: boolean;
-  includeHidden?: boolean;
-}) {
+}: ListFilesArgs) {
   const results: string[] = [];
   // load gitignore patterns if needed
-  let gitignorePatterns: string[] = !includeGitIgnore
+  const gitignorePatterns: string[] = !includeGitIgnore
     ? await getGitIgnores(projectRoot)
     : [];
 

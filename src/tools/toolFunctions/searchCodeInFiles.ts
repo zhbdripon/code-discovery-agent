@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { SearchCodeInFilesArgs } from "../../types";
 
 export default async function searchCodeInFiles({
   files,
@@ -7,13 +8,7 @@ export default async function searchCodeInFiles({
   isRegex = false,
   flags = "",
   projectRoot,
-}: {
-  files: string[];
-  query: string | RegExp;
-  isRegex?: boolean;
-  flags?: string;
-  projectRoot: string;
-}) {
+}: SearchCodeInFilesArgs) {
   const results: { file: string; line: number; content: string }[] = [];
   const normalizedFiles = new Set<string>();
   // Only consider the exact file paths provided. Do not recurse into directories.

@@ -27,7 +27,7 @@ const {
 } = config;
 
 // context for the LLM to keep track of the conversation and tool calls
-let inputOutputHistory: ResponseInputItem[] = [];
+const inputOutputHistory: ResponseInputItem[] = [];
 
 const promptUserForInput = async (): Promise<void> => {
   const newUserInput = await reader.question("user: ");
@@ -43,7 +43,7 @@ async function main() {
     "\n\nProject path (leave empty for current working dir): ",
   );
 
-  let initialQuery = await reader.question(
+  const initialQuery = await reader.question(
     "\n\nWhat do you want to know about the repository?\nuser: ",
   );
 
