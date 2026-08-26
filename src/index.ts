@@ -37,12 +37,6 @@ const promptUserForInput = async (): Promise<void> => {
   });
 };
 
-const resetToolCallCounts = (toolCallCounts: Record<string, number>): void => {
-  for (const toolName in toolCallCounts) {
-    toolCallCounts[toolName] = 0;
-  }
-};
-
 async function main() {
   // Prompt for project root before starting the main loop
   const projectPathInput = await reader.question(
@@ -69,13 +63,9 @@ async function main() {
     toolDefinitions: tools,
     toolFuncFromToolName,
     canUseTool,
+    resetToolCallCounts,
+    incrementToolCallCount,
   } = createTools(projectRoot);
-
-  const toolCallCounts: Record<string, number> = {
-    list_files: 0,
-    search_code: 0,
-    read_file: 0,
-  };
 
   let iterationCount = 0;
 
@@ -112,13 +102,13 @@ async function main() {
 
     if (!toolCalls || toolCalls.length === 0) {
       await promptUserForInput();
-      resetToolCallCounts(toolCallCounts);
+      resetToolCallCounts();
       continue;
     }
 
     for (const toolCall of toolCalls) {
       if (toolFuncFromToolName[toolCall.name]) {
-        if (!canUseTool(toolCallCounts, toolCall.name)) {
+        if (!canUseTool(toolCall.name)) {
           console.log(`Maximum calls reached for toolCall: ${toolCall.name}`);
 
           inputOutputHistory.push({
@@ -131,10 +121,10 @@ async function main() {
           continue;
         }
 
-        toolCallCounts[toolCall.name]++;
+        incrementToolCallCount(toolCall.name);
         const toolArgs = JSON.parse(toolCall.arguments);
         const response = await toolFuncFromToolName[toolCall.name](toolArgs);
-        console.log(`${toolCall.name} Response:`, response);
+        // console.log(`${toolCall.name} Response:`, response);
 
         inputOutputHistory.push({
           type: "function_call_output",

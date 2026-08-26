@@ -31,11 +31,11 @@ export const listFilesTool = {
   strict: true,
 };
 
-export const searchCodeTool = {
+export const searchCodeInFilesTool = {
   type: "function" as const,
-  name: "search_code",
+  name: "search_code_in_files",
   description: `
-    Search the given files for a text pattern. simple string or a valid regex can be used.
+    Search in the given files for a text pattern. simple string or a valid regex can be used.
     Returns matching file paths and relevant lines.
   `,
   parameters: {
@@ -44,7 +44,8 @@ export const searchCodeTool = {
       files: {
         type: "array",
         items: { type: "string" },
-        description: "The list of file paths relative to the repository root to search in",
+        description:
+          "The list of file paths relative to the repository root to search in. Each file path should point to a file, not a directory.",
       },
       query: {
         type: "string",
@@ -85,4 +86,4 @@ export const readFileTool = {
   strict: true,
 };
 
-export const toolDefinitions = [listFilesTool, searchCodeTool, readFileTool];
+export const toolDefinitions = [listFilesTool, searchCodeInFilesTool, readFileTool];

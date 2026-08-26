@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export default async function searchCode({
+export default async function searchCodeInFiles({
   files,
   query,
   isRegex = false,
