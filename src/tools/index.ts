@@ -1,10 +1,8 @@
-import { LocalRepository } from "../repository";
+import { Repository } from "../repository";
 import { asyncFunction } from "../types";
 import { toolDefinitions } from "./toolDefinitions";
 
-export function createTools(projectRoot: string) {
-  const repository = new LocalRepository(projectRoot);
-
+export function createTools(repository: Repository) {
   const toolFuncFromToolName: Record<string, asyncFunction> = {
     list_files: repository.listFiles.bind(repository),
     search_code_in_files: repository.searchCodeInFiles.bind(repository),

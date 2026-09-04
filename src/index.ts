@@ -6,6 +6,7 @@ import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
 import { ResponseInputItem } from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
 import { createTools } from "./tools";
+import { LocalRepository, RepositoryFactory } from "./repository";
 
 // setups
 dotenv.config();
@@ -39,8 +40,8 @@ const promptUserForInput = async (): Promise<void> => {
 
 async function main() {
   // Prompt for project root before starting the main loop
-  const projectPathInput = await reader.question(
-    "\n\nProject path (leave empty for current working dir): ",
+  const projectPathOrUrl = await reader.question(
+    "\n\nProject path or public github url (leave empty for current working dir): ",
   );
 
   const initialQuery = await reader.question(
@@ -52,12 +53,7 @@ async function main() {
     content: initialQuery,
   });
 
-  const projectRoot =
-    projectPathInput && projectPathInput.trim()
-      ? path.isAbsolute(projectPathInput.trim())
-        ? projectPathInput.trim()
-        : path.resolve(process.cwd(), projectPathInput.trim())
-      : process.cwd();
+  const repository = RepositoryFactory.create(projectPathOrUrl)
 
   const {
     toolDefinitions: tools,
@@ -65,7 +61,7 @@ async function main() {
     canUseTool,
     resetToolCallCounts,
     incrementToolCallCount,
-  } = createTools(projectRoot);
+  } = createTools(repository);
 
   let iterationCount = 0;
 
