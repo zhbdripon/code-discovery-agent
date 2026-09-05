@@ -6,7 +6,7 @@ import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
 import { ResponseInputItem } from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
 import { createTools } from "./tools";
-import { LocalRepository, RepositoryFactory } from "./repository";
+import { RepositoryFactory } from "./repository";
 
 // setups
 dotenv.config();

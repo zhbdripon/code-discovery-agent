@@ -23,3 +23,11 @@ export type ReadFileArgs = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type asyncFunction = (...args: any[]) => Promise<unknown>;
 
+export type GithubTreeAPIResponse = {
+  path: string;
+  mode: string;
+  type: string;
+  sha: string;
+  size: number;
+  url: string;
+};
