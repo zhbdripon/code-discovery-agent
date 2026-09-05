@@ -14,6 +14,16 @@ export type SearchCodeInFilesArgs = {
   projectRoot: string;
 };
 
+export type SearchCodeInFilesResult =
+  | {
+      file: string;
+      line: number;
+      content: string;
+    }
+  | {
+      Error: string;
+    };
+
 export type ReadFileArgs = {
   filePath: string;
   projectRoot: string;

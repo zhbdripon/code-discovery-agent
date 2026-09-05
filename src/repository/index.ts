@@ -1,5 +1,10 @@
+import fs from "node:fs";
 import path from "node:path";
-import { ListFilesArgs, SearchCodeInFilesArgs } from "../types";
+import {
+  ListFilesArgs,
+  SearchCodeInFilesArgs,
+  SearchCodeInFilesResult,
+} from "../types";
 import { LocalRepository } from "./LocalRepository";
 import { GithubRepository } from "./GithubRepository";
 
@@ -18,22 +23,29 @@ export interface Repository {
   }>;
   searchCodeInFiles(
     searchArgs: Omit<SearchCodeInFilesArgs, "projectUrl">,
-  ): Promise<{ file: string; line: number; content: string }[]>;
+  ): Promise<SearchCodeInFilesResult[]>;
 }
 
 export class RepositoryFactory {
-  static create(source: string): Repository {
+  static async create(source: string): Promise<Repository> {
     if (source.includes("github.com")) {
-      return new GithubRepository(source);
+      return await GithubRepository.create(source);
     }
 
-    const projectRoot =
-      source && source.trim()
-        ? path.isAbsolute(source.trim())
-          ? source.trim()
-          : path.resolve(process.cwd(), source.trim())
-        : process.cwd();
+    const trimmedSource = source.trim();
 
-    return new LocalRepository(projectRoot);
+    if (trimmedSource) {
+      const projectRoot = path.isAbsolute(trimmedSource)
+        ? trimmedSource
+        : path.resolve(process.cwd(), trimmedSource);
+
+      if (!fs.existsSync(projectRoot) || !fs.statSync(projectRoot).isDirectory()) {
+        throw new Error(`Invalid local repository path: ${projectRoot}`);
+      }
+
+      return new LocalRepository(projectRoot);
+    }
+
+    return new LocalRepository(process.cwd());
   }
 }

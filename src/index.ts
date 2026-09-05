@@ -1,12 +1,11 @@
 import dotenv from "dotenv";
-import path from "node:path";
 import readline from "node:readline/promises";
 import OpenAI from "openai";
 import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
 import { ResponseInputItem } from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
-import { createTools } from "./tools";
 import { RepositoryFactory } from "./repository";
+import { createTools } from "./tools";
 
 // setups
 dotenv.config();
@@ -40,8 +39,12 @@ const promptUserForInput = async (): Promise<void> => {
 
 async function main() {
   // Prompt for project root before starting the main loop
-  const projectPathOrUrl = await reader.question(
+  const localProjectPathOrGithubUrl = await reader.question(
     "\n\nProject path or public github url (leave empty for current working dir): ",
+  );
+
+  const repository = await RepositoryFactory.create(
+    localProjectPathOrGithubUrl,
   );
 
   const initialQuery = await reader.question(
@@ -52,8 +55,6 @@ async function main() {
     role: "user",
     content: initialQuery,
   });
-
-  const repository = RepositoryFactory.create(projectPathOrUrl)
 
   const {
     toolDefinitions: tools,
@@ -78,7 +79,16 @@ async function main() {
             strong reason to.
 
             You can use the tools to explore the repository and answer the user's questions.
-            Do not guess.
+            Workflow:
+            1. Use list_files to discover files.
+            2. Choose the relevant file paths returned by list_files.
+            3. use relevant tool to read the file contents or search for code in files.
+
+            IMPORTANT:
+            - "files" accepts FILE paths only.
+            - Never pass a directory for search_code_in_files.
+            - This tool does not recursively search directories.
+            - Do not guess.
           `,
       tools,
       input: inputOutputHistory,

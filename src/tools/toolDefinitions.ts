@@ -2,27 +2,26 @@ export const listFilesTool = {
   type: "function" as const,
   name: "list_files",
   description:
-    "List files in the given directory path relative to the project root, with optional depth and filters.",
+    "List files and directories under a path. Use this to discover file paths before reading or searching their contents.",
   parameters: {
     type: "object",
     properties: {
       path: {
         type: "string",
-        description: "Path relative to project root to start scanning",
+        description: "Directory path relative to the project root.",
       },
       depth: {
         type: "number",
         description:
-          "Maximum recursion depth (0 = only files in the start directory)",
+          "Maximum directory depth to traverse. 0 lists only entries directly inside the path.",
       },
       includeGitIgnore: {
         type: "boolean",
-        description: "When true, include files ignored by .gitignore",
+        description: "Whether to include gitignored files.",
       },
       includeHidden: {
         type: "boolean",
-        description:
-          "When true, include hidden directories (names starting with a dot)",
+        description: "Whether to include hidden files and directories.",
       },
     },
     additionalProperties: false,
@@ -34,30 +33,32 @@ export const listFilesTool = {
 export const searchCodeInFilesTool = {
   type: "function" as const,
   name: "search_code_in_files",
-  description: `
-    Search in the given files for a text pattern. simple string or a valid regex can be used.
-    Returns matching file paths and relevant lines.
-  `,
+  description:
+    "Search file contents for a text or regex pattern. Accepts file paths only, not directories. Use list_files first to discover files.",
   parameters: {
     type: "object",
     properties: {
       files: {
         type: "array",
-        items: { type: "string" },
         description:
-          "The list of file paths relative to the repository root to search in. Each file path should point to a file, not a directory.",
+          "File paths relative to the repository root. Each item must be an individual file path, not a directory.",
+        items: {
+          type: "string",
+        },
       },
       query: {
         type: "string",
-        description: "The text pattern to search for",
+        description:
+          "Text to search for, or a regex pattern when isRegex is true.",
       },
       isRegex: {
         type: "boolean",
-        description: "When true, treat `query` as a regular expression",
+        description: "Whether query should be treated as a regular expression.",
       },
       flags: {
         type: "string",
-        description: "Optional RegExp flags (e.g. 'i' for case-insensitive')",
+        description:
+          "Regex flags such as 'i'. Use an empty string when not needed.",
       },
     },
     required: ["files", "query", "isRegex", "flags"],
@@ -69,15 +70,14 @@ export const searchCodeInFilesTool = {
 export const readFileTool = {
   type: "function" as const,
   name: "read_file",
-  description: `
-    Read the contents of a repository file.
-  `,
+  description:
+    "Read the contents of one specific file. Use a file path relative to the repository root.",
   parameters: {
     type: "object",
     properties: {
       filePath: {
         type: "string",
-        description: "file path relative to the repository root",
+        description: "Path to a specific file relative to the repository root.",
       },
     },
     required: ["filePath"],
@@ -86,4 +86,8 @@ export const readFileTool = {
   strict: true,
 };
 
-export const toolDefinitions = [listFilesTool, searchCodeInFilesTool, readFileTool];
+export const toolDefinitions = [
+  listFilesTool,
+  searchCodeInFilesTool,
+  readFileTool,
+];
