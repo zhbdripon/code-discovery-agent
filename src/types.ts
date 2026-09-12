@@ -41,3 +41,10 @@ export type GithubTreeAPIResponse = {
   size: number;
   url: string;
 };
+
+export type GitTreeItem = {
+  mode: string;
+  type: "blob" | "tree";
+  sha: string;
+  path: string;
+}

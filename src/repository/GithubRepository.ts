@@ -1,22 +1,57 @@
+import { execFile } from "node:child_process";
+import { rm } from "node:fs/promises";
+import { promisify } from "node:util";
+
 import { Repository } from ".";
 import {
-  GithubTreeAPIResponse,
+  GitTreeItem,
   ListFilesArgs,
   SearchCodeInFilesArgs,
   SearchCodeInFilesResult,
 } from "../types";
 
+const execFileAsync = promisify(execFile);
+
 export class GithubRepository implements Repository {
   private owner: string;
   private repo: string;
   private defaultBranch: string;
-  private fileRecords: GithubTreeAPIResponse[] = [];
+  private isCloned: boolean = false;
+  private isLargeRepo: boolean = false;
   private cachedFileContents: Map<string, string> = new Map();
+  static clonedRepoPath: string = "temp/workingRepo";
 
-  constructor(owner: string, repo: string, defaultBranch: string) {
+  constructor(
+    owner: string,
+    repo: string,
+    defaultBranch: string,
+    isLargeRepo: boolean = false,
+    isCloned: boolean = false,
+  ) {
     this.owner = owner;
     this.repo = repo;
     this.defaultBranch = defaultBranch;
+    this.isLargeRepo = isLargeRepo;
+    this.isCloned = isCloned;
+  }
+
+  static async partialCloneWithoutFiles(repoUrl: string): Promise<void> {
+    console.log("Fetching the file tree.");
+
+    await rm(GithubRepository.clonedRepoPath, {
+      recursive: true,
+      force: true,
+    });
+
+    await execFileAsync("git", [
+      "clone",
+      "--depth=1",
+      "--filter=blob:none",
+      "--no-checkout",
+      repoUrl,
+      GithubRepository.clonedRepoPath,
+    ]);
+    console.log("File tree fetched.");
   }
 
   static async create(repoUrl: string): Promise<GithubRepository> {
@@ -28,12 +63,16 @@ export class GithubRepository implements Repository {
     const urlSplits = repoUrl.split("/");
     const repo = urlSplits.at(-1) || "";
     const owner = urlSplits.at(-2) || "";
-
-    const repoData: Partial<{ default_branch: string }> = await fetch(
+    console.log("fetching repository meta.");
+    const repoData: { default_branch: string; size: number } = await fetch(
       `https://api.github.com/repos/${owner}/${repo}`,
     ).then((res) => res.json());
 
-    const branch = repoData?.default_branch;
+    const branch = repoData.default_branch;
+    const isLargeRepo = repoData.size > 100000;
+    console.log("fetching repository meta.");
+
+    console.log("default_branch:", branch, " | is_large_repo:", isLargeRepo);
 
     if (!branch) {
       throw new Error(
@@ -41,7 +80,79 @@ export class GithubRepository implements Repository {
       );
     }
 
-    return new GithubRepository(owner, repo, branch);
+    await GithubRepository.partialCloneWithoutFiles(
+      `https://github.com/${owner}/${repo}.git`,
+    );
+    return new GithubRepository(owner, repo, branch, isLargeRepo, true);
+  }
+
+  async getTreeNodeContent(nodeSha: string): Promise<GitTreeItem[]> {
+    const { stdout: nodeContent } = await execFileAsync(
+      "git",
+      ["ls-tree", nodeSha],
+      {
+        cwd: GithubRepository.clonedRepoPath,
+      },
+    );
+
+    const tree: GitTreeItem[] = nodeContent
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [modeTreeSha, itemName] = line.split("\t");
+        const [mode, type, sha] = modeTreeSha.split(" ") as [
+          string,
+          "blob" | "tree",
+          string,
+        ];
+        return {
+          mode,
+          type,
+          sha,
+          path: itemName,
+        };
+      });
+    console.log(
+      `Fetched node content for SHA ${nodeSha}:`,
+      tree.length,
+      tree.slice(0, 5),
+    );
+
+    return tree;
+  }
+
+  async walkTree(
+    treeSha: string,
+    currentDepth: number,
+    maxDepth: number,
+    prefix: string,
+  ): Promise<GitTreeItem[]> {
+    console.log(
+      `Walking tree at depth ${currentDepth} for SHA ${treeSha} with prefix "${prefix}"`,
+    );
+    const tree = await this.getTreeNodeContent(treeSha);
+
+    const files: GitTreeItem[] = [];
+
+    for (const entry of tree) {
+      const path = prefix ? `${prefix}/${entry.path}` : entry.path;
+
+      if (entry.type === "blob") {
+        files.push({
+          ...entry,
+          path,
+        });
+        continue;
+      }
+
+      if (entry.type === "tree" && currentDepth < maxDepth) {
+        files.push(
+          ...(await this.walkTree(entry.sha, currentDepth + 1, maxDepth, path)),
+        );
+      }
+    }
+    console.log(`Found ${files.length} files at depth ${currentDepth}`);
+    return files;
   }
 
   async listFiles({
@@ -50,49 +161,34 @@ export class GithubRepository implements Repository {
     includeGitIgnore,
     includeHidden,
   }: ListFilesArgs) {
-    const filesData = await fetch(
-      `https://api.github.com/repos/${this.owner}/${this.repo}/git/trees/${this.defaultBranch}?recursive=1`,
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        return data;
-      });
+    console.log("listFiles called with:", {
+      startPath,
+      depth,
+      includeGitIgnore,
+      includeHidden,
+    });
 
     const startPathNormalized =
       startPath === "." || !startPath ? "" : startPath.replace(/^\.\//, "");
 
-    this.fileRecords = filesData.tree.filter(
-      (file: GithubTreeAPIResponse) =>
-        file.type === "blob" && file.path.startsWith(startPathNormalized),
+    const { stdout: startPathSha } = await execFileAsync(
+      "git",
+      [
+        "rev-parse",
+        `HEAD${startPathNormalized ? `:${startPathNormalized}` : ""}`,
+      ],
+      {
+        cwd: GithubRepository.clonedRepoPath,
+      },
     );
 
-    const fileList = this.fileRecords.map(
-      (file: GithubTreeAPIResponse) => file.path,
+    const files = await this.walkTree(startPathSha.trim(), 0, depth ?? 1, "");
+
+    console.log(
+      "Listed files:",
+      files.map((file) => file.path),
     );
-
-    return fileList;
-  }
-
-  private async fetchGitHubFileData(
-    url: string,
-  ): Promise<{ content?: string; message?: string } | null> {
-    try {
-      const res = await fetch(url);
-
-      if (!res.ok) {
-        return null;
-      }
-
-      const data = (await res.json()) as { content?: string; message?: string };
-
-      if (data?.message) {
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      return null;
-    }
+    return files.map((file) => file.path);
   }
 
   async getFileContent(
@@ -102,35 +198,16 @@ export class GithubRepository implements Repository {
       return this.cachedFileContents.get(filePath) as string;
     }
 
-    const fileRecord = this.fileRecords.find((file) => file.path === filePath);
-
-    const fileData = fileRecord
-      ? await this.fetchGitHubFileData(fileRecord.url)
-      : await this.fetchGitHubFileData(
-          `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${filePath}?ref=${this.defaultBranch}`,
-        );
-
-    if (Array.isArray(fileData)) {
-      return {
-        errorMessage: `Directory path is not supported. Provide a valid file path.`,
-      };
-    }
-
-    if (!fileData?.content) {
-      return {
-        errorMessage: `The file ${filePath} was not found in the repository.`,
-      };
-    }
-
-    try {
-      const content = Buffer.from(fileData.content, "base64").toString("utf-8");
-      this.cachedFileContents.set(filePath, content);
-      return content;
-    } catch (error) {
-      return {
-        errorMessage: `Failed to decode the content of the file ${filePath}.`,
-      };
-    }
+    const { stdout: fileContent } = await execFileAsync(
+      "git",
+      ["show", `HEAD:${filePath}`],
+      {
+        cwd: GithubRepository.clonedRepoPath,
+      },
+    );
+    console.log(`Fetched content for file ${filePath} from GitHub.`);
+    this.cachedFileContents.set(filePath, fileContent);
+    return fileContent;
   }
 
   async readFile({ filePath }: { filePath: string }) {
