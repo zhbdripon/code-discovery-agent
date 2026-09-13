@@ -1,20 +1,21 @@
 import fs from "node:fs";
-import path from "node:path";
+import nodePath from "node:path";
 import {
   ListFilesArgs,
+  ListFilesReturnItem,
   SearchCodeInFilesArgs,
   SearchCodeInFilesResult,
 } from "../types";
-import { LocalRepository } from "./LocalRepository";
 import { GithubRepository } from "./GithubRepository";
+import { LocalRepository } from "./LocalRepository";
 
 export interface Repository {
   listFiles({
-    startPath,
+    path,
     depth,
     includeGitIgnore,
     includeHidden,
-  }: ListFilesArgs): Promise<string[]>;
+  }: ListFilesArgs): Promise<ListFilesReturnItem[]>;
   readFile({ filePath }: { filePath: string }): Promise<{
     ok: boolean;
     content?: string;
@@ -35,11 +36,14 @@ export class RepositoryFactory {
     const trimmedSource = source.trim();
 
     if (trimmedSource) {
-      const projectRoot = path.isAbsolute(trimmedSource)
+      const projectRoot = nodePath.isAbsolute(trimmedSource)
         ? trimmedSource
-        : path.resolve(process.cwd(), trimmedSource);
+        : nodePath.resolve(process.cwd(), trimmedSource);
 
-      if (!fs.existsSync(projectRoot) || !fs.statSync(projectRoot).isDirectory()) {
+      if (
+        !fs.existsSync(projectRoot) ||
+        !fs.statSync(projectRoot).isDirectory()
+      ) {
         throw new Error(`Invalid local repository path: ${projectRoot}`);
       }
 

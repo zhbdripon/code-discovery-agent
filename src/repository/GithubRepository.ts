@@ -70,9 +70,7 @@ export class GithubRepository implements Repository {
 
     const branch = repoData.default_branch;
     const isLargeRepo = repoData.size > 100000;
-    console.log("fetching repository meta.");
-
-    console.log("default_branch:", branch, " | is_large_repo:", isLargeRepo);
+    console.log("Default Branch:", branch, "\nLarge Repo:", isLargeRepo);
 
     if (!branch) {
       throw new Error(
@@ -112,11 +110,6 @@ export class GithubRepository implements Repository {
           path: itemName,
         };
       });
-    console.log(
-      `Fetched node content for SHA ${nodeSha}:`,
-      tree.length,
-      tree.slice(0, 5),
-    );
 
     return tree;
   }
@@ -137,7 +130,7 @@ export class GithubRepository implements Repository {
     for (const entry of tree) {
       const path = prefix ? `${prefix}/${entry.path}` : entry.path;
 
-      if (entry.type === "blob") {
+      if (["blob", "tree"].includes(entry.type)) {
         files.push({
           ...entry,
           path,
@@ -156,20 +149,20 @@ export class GithubRepository implements Repository {
   }
 
   async listFiles({
-    startPath,
+    path,
     depth,
     includeGitIgnore,
     includeHidden,
   }: ListFilesArgs) {
     console.log("listFiles called with:", {
-      startPath,
+      path,
       depth,
       includeGitIgnore,
       includeHidden,
     });
 
     const startPathNormalized =
-      startPath === "." || !startPath ? "" : startPath.replace(/^\.\//, "");
+      path === "." || !path ? "" : path.replace(/^\.\//, "");
 
     const { stdout: startPathSha } = await execFileAsync(
       "git",
@@ -182,13 +175,18 @@ export class GithubRepository implements Repository {
       },
     );
 
-    const files = await this.walkTree(startPathSha.trim(), 0, depth ?? 1, "");
+    const items = await this.walkTree(startPathSha.trim(), 0, depth ?? 1, "");
 
-    console.log(
-      "Listed files:",
-      files.map((file) => file.path),
-    );
-    return files.map((file) => file.path);
+    const ret = items.map((item) => ({
+      path: item.path,
+      type: (item.type === "blob" ? "file" : "directory") as
+        | "file"
+        | "directory",
+    }));
+
+    console.log(`listFiles returning ${ret.length} items for path "${path}"`);
+
+    return ret;
   }
 
   async getFileContent(
@@ -211,19 +209,31 @@ export class GithubRepository implements Repository {
   }
 
   async readFile({ filePath }: { filePath: string }) {
-    const content = await this.getFileContent(filePath);
+    try {
+      const content = await this.getFileContent(filePath);
 
-    if (typeof content === "string") {
+      if (typeof content === "string") {
+        return {
+          ok: true,
+          content,
+        };
+      }
+    } catch (error) {
+      console.log(`Failed to read file at ${filePath}:`, error);
       return {
-        ok: true,
-        content,
+        ok: false,
+        error: "read_error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unknown error occurred while reading the file.",
       };
     }
 
     return {
       ok: false,
-      error: "Failed to read file",
-      message: content.errorMessage,
+      error: "read_error",
+      message: `Failed to read file ${filePath}.`,
     };
   }
 

@@ -12,14 +12,14 @@ export class LocalRepository implements Repository {
   }
 
   async listFiles({
-    startPath,
+    path,
     depth,
     includeGitIgnore,
     includeHidden,
   }: ListFilesArgs) {
     return await listFilesImpl({
       projectRoot: this.projectRoot,
-      startPath,
+      path,
       depth,
       includeGitIgnore,
       includeHidden,

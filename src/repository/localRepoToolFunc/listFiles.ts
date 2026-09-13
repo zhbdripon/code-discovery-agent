@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
-import path from "node:path";
-import { ListFilesArgs } from "../../types";
+import nodePath from "node:path";
+import { ListFilesArgs, ListFilesReturnItem } from "../../types";
 
 const HARD_EXCLUDE = new Set([".git", ".next", "node_modules"]);
 
 async function getGitIgnores(projectRoot: string): Promise<string[]> {
-  const gitignorePath = path.join(projectRoot, ".gitignore");
+  const gitignorePath = nodePath.join(projectRoot, ".gitignore");
   try {
     const content = await fs.readFile(gitignorePath, "utf-8");
     return content
@@ -48,16 +48,15 @@ function matchesGitignore(relPosix: string, patterns: string[]) {
 
 export default async function listFiles({
   projectRoot,
-  startPath = ".",
+  path = ".",
   depth = Infinity,
   includeGitIgnore = false,
   includeHidden = false,
 }: ListFilesArgs) {
-  const results: string[] = [];
-  // load gitignore patterns if needed
-  const gitignorePatterns: string[] = !includeGitIgnore
-    ? await getGitIgnores(projectRoot)
-    : [];
+  const results: ListFilesReturnItem[] = [];
+  const gitignorePatterns: string[] = includeGitIgnore
+    ? []
+    : await getGitIgnores(projectRoot);
 
   async function walk(dir: string, currentDepth: number) {
     if (currentDepth > depth) return;
@@ -69,40 +68,36 @@ export default async function listFiles({
     }
 
     for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      const rel = path.relative(projectRoot, full) || entry.name;
-      const relPosix = rel.split(path.sep).join("/");
-      const segments = rel.split(path.sep).filter(Boolean);
+      const full = nodePath.join(dir, entry.name);
+      const rel = nodePath.relative(projectRoot, full) || entry.name;
+      const relPosix = rel.split(nodePath.sep).join("/");
+      const segments = rel.split(nodePath.sep).filter(Boolean);
 
       // Hard exclusions always apply
       if (segments.some((s) => HARD_EXCLUDE.has(s))) continue;
 
-      // Handle gitignore exclusion when includeGitIgnore == false
-      if (!includeGitIgnore && gitignorePatterns.length > 0) {
+      if (includeGitIgnore === false && gitignorePatterns.length > 0) {
         if (matchesGitignore(relPosix, gitignorePatterns)) continue;
       }
 
-      // Hidden handling: includeHidden applies to folders only.
-      // Determine if this entry is inside a hidden directory (parent dirs).
       const parentDirs = segments.slice(0, -1);
       const isInHiddenDir = parentDirs.some((s) => s.startsWith("."));
       if (!includeHidden && isInHiddenDir) continue;
 
       if (entry.isDirectory()) {
-        // Skip hidden directory itself when includeHidden is false
         if (!includeHidden && entry.name.startsWith(".")) continue;
-        // recurse if depth allows
+        results.push({ path: rel, type: "directory" });
         if (currentDepth < depth) {
           await walk(full, currentDepth + 1);
         }
       } else if (entry.isFile()) {
-        // Files that start with a dot are allowed unless they live inside a hidden directory
-        results.push(rel);
+        results.push({ path: rel, type: "file" });
       }
     }
   }
 
-  const startFull = path.resolve(projectRoot, startPath);
+  const startFull = nodePath.resolve(projectRoot, path);
   await walk(startFull, 0);
+
   return results;
 }

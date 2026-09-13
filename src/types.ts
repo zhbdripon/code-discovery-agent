@@ -1,6 +1,6 @@
 export type ListFilesArgs = {
   projectRoot: string;
-  startPath?: string;
+  path?: string;
   depth?: number;
   includeGitIgnore?: boolean;
   includeHidden?: boolean;
@@ -47,4 +47,6 @@ export type GitTreeItem = {
   type: "blob" | "tree";
   sha: string;
   path: string;
-}
+};
+
+export type ListFilesReturnItem = { path: string; type: "file" | "directory" };
