@@ -2,13 +2,16 @@ export const listFilesTool = {
   type: "function" as const,
   name: "list_files",
   description:
-    "List files and directories under a path. Use this to discover file paths before reading or searching their contents.",
+    "List files and directories under a path as a compact tree. " +
+    "Directories end with '/'; indentation shows nesting, and collapsed paths may combine consecutive directories. " +
+    "Use this to explore the project structure and discover paths before reading or searching file contents.",
   parameters: {
     type: "object",
     properties: {
       path: {
         type: "string",
-        description: "Directory path relative to the project root.",
+        description:
+          "Directory path relative to the project root. Use '.' for the project root.",
       },
       depth: {
         type: "number",
@@ -17,11 +20,13 @@ export const listFilesTool = {
       },
       includeGitIgnore: {
         type: "boolean",
-        description: "Whether to include gitignored files.",
+        description:
+          "Whether to include files and directories excluded by .gitignore.",
       },
       includeHidden: {
         type: "boolean",
-        description: "Whether to include hidden files and directories.",
+        description:
+          "Whether to include hidden files and directories whose names start with '.'.",
       },
     },
     additionalProperties: false,

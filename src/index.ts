@@ -80,7 +80,7 @@ async function main() {
 
             You can use the tools to explore the repository and answer the user's questions.
             Workflow:
-            1. Use list_files to discover files.
+            1. Use list_files to discover files. start with depth 0 and then go deeper if needed. Use the output of list_files to understand the project structure.
             2. Choose the relevant file paths returned by list_files.
             3. use relevant tool to read the file contents or search for code in files.
 

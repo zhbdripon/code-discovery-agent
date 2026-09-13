@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import nodePath from "node:path";
 import { ListFilesArgs, ListFilesReturnItem } from "../../types";
+import { formatFileTree } from "../../utils";
 
 const HARD_EXCLUDE = new Set([".git", ".next", "node_modules"]);
 
@@ -98,6 +99,5 @@ export default async function listFiles({
 
   const startFull = nodePath.resolve(projectRoot, path);
   await walk(startFull, 0);
-
-  return results;
+  return formatFileTree(results);
 }

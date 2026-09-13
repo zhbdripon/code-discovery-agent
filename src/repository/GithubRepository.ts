@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { rm } from "node:fs/promises";
 import { promisify } from "node:util";
+import { formatFileTree } from "../utils";
 
 import { Repository } from ".";
 import {
@@ -135,7 +136,6 @@ export class GithubRepository implements Repository {
           ...entry,
           path,
         });
-        continue;
       }
 
       if (entry.type === "tree" && currentDepth < maxDepth) {
@@ -186,7 +186,7 @@ export class GithubRepository implements Repository {
 
     console.log(`listFiles returning ${ret.length} items for path "${path}"`);
 
-    return ret;
+    return formatFileTree(ret);
   }
 
   async getFileContent(
