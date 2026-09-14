@@ -50,3 +50,16 @@ export type GitTreeItem = {
 };
 
 export type ListFilesReturnItem = { path: string; type: "file" | "directory" };
+
+export type ListFileError = {
+  ok: false;
+  error: string;
+  message: string;
+};
+
+export type ReadFileResult = {
+  ok: boolean;
+  content?: string;
+  error?: string;
+  message?: string;
+};

@@ -16,9 +16,9 @@ export function createTools(repository: Repository) {
   };
 
   const maxToolCallPerTurn: Record<string, number> = {
-    list_files: 5,
-    search_code_in_files: 10,
-    read_file: 10,
+    list_files: 20,
+    search_code_in_files: 20,
+    read_file: 20,
   };
 
   const canUseTool = (toolName: string): boolean => {

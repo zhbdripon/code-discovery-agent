@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import nodePath from "node:path";
 import {
+  ListFileError,
   ListFilesArgs,
+  ReadFileResult,
   SearchCodeInFilesArgs,
   SearchCodeInFilesResult,
 } from "../types";
@@ -14,13 +16,8 @@ export interface Repository {
     depth,
     includeGitIgnore,
     includeHidden,
-  }: ListFilesArgs): Promise<string>;
-  readFile({ filePath }: { filePath: string }): Promise<{
-    ok: boolean;
-    content?: string;
-    error?: string;
-    message?: string;
-  }>;
+  }: ListFilesArgs): Promise<string | ListFileError>;
+  readFile({ filePath }: { filePath: string }): Promise<ReadFileResult>;
   searchCodeInFiles(
     searchArgs: Omit<SearchCodeInFilesArgs, "projectUrl">,
   ): Promise<SearchCodeInFilesResult[]>;

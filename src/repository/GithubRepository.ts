@@ -154,39 +154,51 @@ export class GithubRepository implements Repository {
     includeGitIgnore,
     includeHidden,
   }: ListFilesArgs) {
-    console.log("listFiles called with:", {
-      path,
-      depth,
-      includeGitIgnore,
-      includeHidden,
-    });
+    try {
+      console.log("listFiles called with:", {
+        path,
+        depth,
+        includeGitIgnore,
+        includeHidden,
+      });
 
-    const startPathNormalized =
-      path === "." || !path ? "" : path.replace(/^\.\//, "");
+      const startPathNormalized =
+        path === "." || !path ? "" : path.replace(/^\.\//, "");
 
-    const { stdout: startPathSha } = await execFileAsync(
-      "git",
-      [
-        "rev-parse",
-        `HEAD${startPathNormalized ? `:${startPathNormalized}` : ""}`,
-      ],
-      {
-        cwd: GithubRepository.clonedRepoPath,
-      },
-    );
+      const { stdout: startPathSha } = await execFileAsync(
+        "git",
+        [
+          "rev-parse",
+          `HEAD${startPathNormalized ? `:${startPathNormalized}` : ""}`,
+        ],
+        {
+          cwd: GithubRepository.clonedRepoPath,
+        },
+      );
 
-    const items = await this.walkTree(startPathSha.trim(), 0, depth ?? 1, "");
+      const items = await this.walkTree(startPathSha.trim(), 0, depth ?? 1, "");
 
-    const ret = items.map((item) => ({
-      path: item.path,
-      type: (item.type === "blob" ? "file" : "directory") as
-        | "file"
-        | "directory",
-    }));
+      const ret = items.map((item) => ({
+        path: item.path,
+        type: (item.type === "blob" ? "file" : "directory") as
+          | "file"
+          | "directory",
+      }));
 
-    console.log(`listFiles returning ${ret.length} items for path "${path}"`);
+      console.log(`listFiles returning ${ret.length} items for path "${path}"`);
 
-    return formatFileTree(ret);
+      return formatFileTree(ret);
+    } catch (error) {
+      console.error(`Failed to list files for path "${path}":`, error);
+      return {
+        ok: false as const,
+        error: "list_files_error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unknown error occurred while listing files.",
+      };
+    }
   }
 
   async getFileContent(
