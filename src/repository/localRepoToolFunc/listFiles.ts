@@ -1,10 +1,6 @@
 import fs from "node:fs/promises";
 import nodePath from "node:path";
-import {
-  ListFileError,
-  ListFilesArgs,
-  ListFilesReturnItem,
-} from "../../types";
+import { ListFileError, ListFilesArgs, ListFilesReturnItem } from "../../types";
 import { formatFileTree } from "../../utils";
 
 const HARD_EXCLUDE = new Set([".git", ".next", "node_modules"]);
@@ -58,50 +54,51 @@ export default async function listFiles({
   includeGitIgnore = false,
   includeHidden = false,
 }: ListFilesArgs): Promise<string | ListFileError> {
-  try {
-    const results: ListFilesReturnItem[] = [];
-    const gitignorePatterns: string[] = includeGitIgnore
-      ? []
-      : await getGitIgnores(projectRoot);
+  const results: ListFilesReturnItem[] = [];
+  let gitignorePatterns: string[] = [];
 
-    async function walk(dir: string, currentDepth: number) {
-      if (currentDepth > depth) return;
-      let entries;
-      try {
-        entries = await fs.readdir(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-
-      for (const entry of entries) {
-        const full = nodePath.join(dir, entry.name);
-        const rel = nodePath.relative(projectRoot, full) || entry.name;
-        const relPosix = rel.split(nodePath.sep).join("/");
-        const segments = rel.split(nodePath.sep).filter(Boolean);
-
-        // Hard exclusions always apply
-        if (segments.some((s) => HARD_EXCLUDE.has(s))) continue;
-
-        if (includeGitIgnore === false && gitignorePatterns.length > 0) {
-          if (matchesGitignore(relPosix, gitignorePatterns)) continue;
-        }
-
-        const parentDirs = segments.slice(0, -1);
-        const isInHiddenDir = parentDirs.some((s) => s.startsWith("."));
-        if (!includeHidden && isInHiddenDir) continue;
-
-        if (entry.isDirectory()) {
-          if (!includeHidden && entry.name.startsWith(".")) continue;
-          results.push({ path: rel, type: "directory" });
-          if (currentDepth < depth) {
-            await walk(full, currentDepth + 1);
-          }
-        } else if (entry.isFile()) {
-          results.push({ path: rel, type: "file" });
-        }
-      }
+  async function walk(dir: string, currentDepth: number) {
+    if (currentDepth > depth) return;
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
     }
 
+    for (const entry of entries) {
+      const full = nodePath.join(dir, entry.name);
+      const rel = nodePath.relative(projectRoot, full) || entry.name;
+      const relPosix = rel.split(nodePath.sep).join("/");
+      const segments = rel.split(nodePath.sep).filter(Boolean);
+
+      // Hard exclusions always apply
+      if (segments.some((s) => HARD_EXCLUDE.has(s))) continue;
+
+      if (includeGitIgnore === false && gitignorePatterns.length > 0) {
+        if (matchesGitignore(relPosix, gitignorePatterns)) continue;
+      }
+
+      const parentDirs = segments.slice(0, -1);
+      const isInHiddenDir = parentDirs.some((s) => s.startsWith("."));
+      if (!includeHidden && isInHiddenDir) continue;
+
+      if (entry.isDirectory()) {
+        if (!includeHidden && entry.name.startsWith(".")) continue;
+        results.push({ path: rel, type: "directory" });
+        if (currentDepth < depth) {
+          await walk(full, currentDepth + 1);
+        }
+      } else if (entry.isFile()) {
+        results.push({ path: rel, type: "file" });
+      }
+    }
+  }
+
+  try {
+    gitignorePatterns = includeGitIgnore
+      ? []
+      : await getGitIgnores(projectRoot);
     const startFull = nodePath.resolve(projectRoot, path);
     await walk(startFull, 0);
     return formatFileTree(results);
