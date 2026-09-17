@@ -2,7 +2,10 @@ import dotenv from "dotenv";
 import readline from "node:readline/promises";
 import OpenAI from "openai";
 import { toResponseInputItems } from "openai/lib/responses/ResponseInputItems";
-import { ResponseInputItem } from "openai/resources/responses/responses.js";
+import {
+  ResponseInputItem,
+  ResponseOutputItem
+} from "openai/resources/responses/responses.js";
 import { getConfig } from "./config";
 import { RepositoryFactory } from "./repository";
 import { createTools } from "./tools";
@@ -10,9 +13,11 @@ import { createTools } from "./tools";
 // setups
 dotenv.config();
 const config = getConfig();
+
 const client = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
 });
+
 const reader = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -26,11 +31,12 @@ const {
   maxModelLoop: number;
 } = config;
 
-// context for the LLM to keep track of the conversation and tool calls
+// Context for the LLM to keep track of the conversation and tool calls
 const inputOutputHistory: ResponseInputItem[] = [];
 
 const promptUserForInput = async (): Promise<void> => {
   const newUserInput = await reader.question("user: ");
+
   inputOutputHistory.push({
     role: "user",
     content: newUserInput,
@@ -69,44 +75,78 @@ async function main() {
   while (iterationCount <= maxModelLoop) {
     iterationCount++;
 
-    const response = await client.responses.create({
+    const stream = await client.responses.create({
       model: "gpt-5.4-mini",
       instructions: `
-            You are a software repository investigation assistant.
-      
-            Investigate the repository using tools. Generally you don't want to discover files 
-            and folders ignored by .gitignore and hidden folders start with dot unless you have a 
-            strong reason to.
+        You are a software repository investigation assistant.
 
-            You can use the tools to explore the repository and answer the user's questions.
-            Workflow:
-            1. Use list_files to discover files. start with depth 0 and then go deeper if needed. Use the output of list_files to understand the project structure.
-            2. Choose the relevant file paths returned by list_files.
-            3. use relevant tool to read the file contents or search for code in files.
+        Investigate the repository using tools. Generally you don't want to discover files
+        and folders ignored by .gitignore and hidden folders start with dot unless you have a
+        strong reason to.
 
-            IMPORTANT:
-            - "files" accepts FILE paths only.
-            - Never pass a directory for search_code_in_files.
-            - This tool does not recursively search directories.
-            - Do not guess.
-          `,
+        You can use the tools to explore the repository and answer the user's questions.
+        Workflow:
+        1. Use list_files to discover files. start with depth 0 and then go deeper if needed. Use the output of list_files to understand the project structure.
+        2. Choose the relevant file paths returned by list_files.
+        3. use relevant tool to read the file contents or search for code in files.
+
+        IMPORTANT:
+        - "files" accepts FILE paths only.
+        - Never pass a directory for search_code_in_files.
+        - This tool does not recursively search directories.
+        - Do not guess.
+      `,
       tools,
       input: inputOutputHistory,
+      stream: true,
     });
 
-    inputOutputHistory.push(...toResponseInputItems(response.output));
+    const outputItems: ResponseOutputItem[] = [];
+    let hasTextOutput = false;
 
-    console.log(
-      "Response from llm on iteration " + iterationCount + ": ",
-      response.output,
-      response.output_text,
-    );
+    for await (const event of stream) {
+      switch (event.type) {
+        case "response.output_item.added": {
+          outputItems.push(event.item);
+          break;
+        }
 
-    const toolCalls = response.output.filter(
+        case "response.output_text.delta": {
+          if (!hasTextOutput) {
+            process.stdout.write("\nassistant: ");
+            hasTextOutput = true;
+          }
+
+          process.stdout.write(event.delta);
+          break;
+        }
+
+        case "response.output_item.done": {
+          const index = outputItems.findIndex(
+            (item) => item.id === event.item.id,
+          );
+
+          if (index !== -1) {
+            outputItems[index] = event.item;
+          }
+
+          break;
+        }
+
+        case "response.completed": {
+          process.stdout.write("\n");
+          break;
+        }
+      }
+    }
+
+    inputOutputHistory.push(...toResponseInputItems(outputItems));
+
+    const toolCalls = outputItems.filter(
       (item) => item.type === "function_call",
     );
 
-    if (!toolCalls || toolCalls.length === 0) {
+    if (toolCalls.length === 0) {
       await promptUserForInput();
       resetToolCallCounts();
       continue;
@@ -124,13 +164,17 @@ async function main() {
               error: `Tool "${toolCall.name}" has reached its usage limit.`,
             }),
           });
+
           continue;
         }
 
+        console.log(`\n[Calling tool: ${toolCall.name}]`);
+
         incrementToolCallCount(toolCall.name);
+
         const toolArgs = JSON.parse(toolCall.arguments);
+
         const response = await toolFuncFromToolName[toolCall.name](toolArgs);
-        // console.log(`${toolCall.name} Response:`, response);
 
         inputOutputHistory.push({
           type: "function_call_output",
